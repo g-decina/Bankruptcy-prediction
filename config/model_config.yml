@@ -1,0 +1,40 @@
+firm_data: data/demo_data.xlsx
+macro_data:
+  - data/insee/serie_000857176_04042025/valeurs_mensuelles.csv
+  - data/insee/serie_000857180_04042025/valeurs_mensuelles.csv
+  - data/insee/serie_001763782_04042025/valeurs_mensuelles.csv
+
+bankruptcy_col: Status date
+company_col: Company name Latin alphabet
+
+revenue_cap: 3000
+num_classes: 2
+batch_size: 128
+epochs: 50
+lr: 5e-3
+hidden_size: [32, 16]
+num_layers: 2
+dropout: 0.2
+threshold: 0.7
+
+alpha: 0.90
+gamma: 2.5
+
+scheduler_factor: 0.75
+scheduler_patience: 5
+stopping_patience: 15
+min_lr: 1e-5
+
+decay_ih: 1e-5
+decay_hh: 1e-4
+decay_other: 1e-5
+
+train_fract: 0.8
+
+device: mps
+
+metrics:
+  - f1
+  - accuracy
+  - auroc
+  - matthews
