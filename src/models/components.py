@@ -120,7 +120,7 @@ class VariableSelectionNetwork(nn.Module):
             for i, grn in enumerate(self.vars_grns)
         ] 
         
-        stacked = torch.cat(transformed, dim=-1) # (B, T, D, n)
+        stacked = torch.stack(transformed, dim=-1) # (B, T, D, n)
         output = torch.sum(stacked * sparse, dim=-1) # (B, T, D)
         
         return output, sparse # output: context vector
