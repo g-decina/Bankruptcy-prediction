@@ -1,8 +1,8 @@
 firm_data: data/demo_data.xlsx
 macro_data:
-  - "010774417" # Sector-level turnover
-  - "001763782" # Sector-level CPI
-  - "001587668" # Household confidence index
+  - data/insee/serie_000857176_04042025/valeurs_mensuelles.csv
+  - data/insee/serie_000857180_04042025/valeurs_mensuelles.csv
+  - data/insee/serie_001763782_04042025/valeurs_mensuelles.csv
 
 bankruptcy_col: Status date
 company_col: Company name Latin alphabet
@@ -12,7 +12,7 @@ num_classes: 2
 batch_size: 128
 epochs: 50
 lr: 5e-3
-hidden_size: 64
+hidden_size: [32, 16]
 num_layers: 2
 dropout: 0.2
 threshold: 0.7

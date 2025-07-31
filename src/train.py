@@ -3,6 +3,8 @@ import logging
 import torch
 from tqdm import trange
 
+from torchmetrics.classification import BinaryAccuracy, BinaryF1Score, BinaryMatthewsCorrCoef
+
 from torch.nn.utils import clip_grad_norm_
 from src.utils.utils import RollingEarlyStopping, find_best_threshold
 
@@ -30,7 +32,12 @@ def train_one_epoch(model, loader, optimizer, loss_fn, device, metrics):
         
         total_loss += loss.item()
         for metric in metrics.values():
-            metric.update(preds, labels.int())
+            for metric in metrics.values():
+                if isinstance(metric, (BinaryF1Score, BinaryMatthewsCorrCoef, BinaryAccuracy)):
+                    preds_binary = (preds.sigmoid() > 0.5).int()
+                    metric.update(preds_binary, labels.int())
+                else:
+                    metric.update(preds, labels.int())
     
     avg_loss = total_loss / len(loader)
     computed_metrics = {
@@ -49,15 +56,18 @@ def evaluate_one_epoch(model, loader, loss_fn, device, metrics):
         for batch in loader:
             firm_seq = batch["firm_seq"].to(device)
             macro_seq = batch["macro_seq"].to(device)
-            ones = torch.ones_like(macro_seq).to(device)
             labels = batch["label"].to(device)
             
-            preds = model(firm_seq, ones)
+            preds = model(firm_seq, macro_seq)
             loss = loss_fn(preds, labels)
             total_loss += loss.item()
             
             for metric in metrics.values():
-                metric.update(preds, labels)
+                if isinstance(metric, (BinaryF1Score, BinaryMatthewsCorrCoef, BinaryAccuracy)):
+                    preds_binary = (preds.sigmoid() > 0.5).int()
+                    metric.update(preds_binary, labels.int())
+                else:
+                    metric.update(preds, labels.int())
                 
     avg_loss = total_loss / len(loader)
     computed_metrics = {

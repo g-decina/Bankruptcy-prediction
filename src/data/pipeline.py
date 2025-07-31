@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 class IngestionPipeline:
     def __init__(self, 
             company_path: Path, 
-            macro_paths: list[Path],
+            macro_paths: list[str],
             company_col: str, 
             bankruptcy_col: str,
             mode: str="train",

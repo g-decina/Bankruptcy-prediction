@@ -3,6 +3,8 @@ import numpy as np
 from pathlib import Path
 import logging
 
+from src.data.insee import get_insee_series
+
 logger = logging.getLogger(__name__)
 
 class CompanyDataLoader:
@@ -115,15 +117,28 @@ class CompanyDataLoader:
         return df.reset_index(drop=True)
 
 class MacroDataLoader:
-    def __init__(self, macro_paths: list[Path]):
-        self.paths = macro_paths
+    def __init__(self, ids: list[str]):
+        self.ids = ids
         
     def load(self) -> pd.DataFrame:
-        logger.info(f"Loading {len(self.paths)} macroeconomic series...")
-        series_list = [self._load_series(path) for path in self.paths]
-        df = pd.DataFrame(series_list).T.dropna(how="any")
+        logger.info(f"Loading {len(self.ids)} macroeconomic series...")
+        series = [get_insee_series(id) for id in self.ids]
+        
+        df = pd.concat(series, axis=1)
+        df.columns = self.ids
+        
+        # Interpolate missing values
+        df = df.interpolate(
+            method="linear", 
+            axis=0,
+            limit_direction="both",
+            limit=None,
+            inplace=None
+        )
+        
         return df
     
+    # OBSOLETE — import function for CSV files
     def _load_series(self, path: Path) -> pd.Series:
         df = pd.read_csv(
             path,

@@ -71,7 +71,7 @@ class DualInputSequenceDataset(Dataset):
         labels_flat_cpu = self.labels.cpu().numpy().squeeze()
         
         if seed is None:
-            seed = rand.randint(1, 100_000)
+            seed = rand.randint(1, 1_000_000)
             
         splitter = StratifiedShuffleSplit(
             n_splits=1, 
@@ -97,7 +97,7 @@ class DualInputSequenceDataset(Dataset):
     
     def random_split(self, train_fract: float = 0.8, seed: Optional[int] = None):
         if seed is None:
-            seed = rand.randint(1, 100_000)
+            seed = rand.randint(1, 1_000_000)
         
         torch.manual(seed)
         train_size = int(train_fract * len(self))
@@ -116,4 +116,4 @@ class DualInputSequenceDataset(Dataset):
         self.macro_tensor = self.macro_tensor.to(device)
         self.labels = self.labels.to(device)
         
-        return self
+        print(f"Data sent to device: {device}")

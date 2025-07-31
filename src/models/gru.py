@@ -37,9 +37,9 @@ class GRUModel(nn.Module):
 
         # ---- Joining the two sub-networks ----
         self.fc = nn.Sequential(
-            nn.LayerNorm(hidden_size * 2),
+            nn.LayerNorm(hidden_size),
             nn.Dropout(dropout),
-            nn.Linear(hidden_size * 2, hidden_size),
+            nn.Linear(hidden_size, hidden_size),
             nn.ReLU(),
             nn.Linear(hidden_size, output_size)
         )
@@ -69,8 +69,8 @@ class GRUModel(nn.Module):
         macro_norm = self.macro_bn(macro_out)
 
         combined = torch.cat([firm_norm, macro_norm], dim=1)
-        out = self.fc(combined)
-
+        combined_pooled = combined.mean(dim=1)
+        out = self.fc(combined_pooled)
         return out
     
     def predict(self, firm, macro, threshold: float = 0.5) -> dict:
