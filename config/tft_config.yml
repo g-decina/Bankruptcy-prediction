@@ -1,0 +1,40 @@
+firm_data: data/demo_data.xlsx
+macro_data:
+  - "010774417" # Sector-level turnover
+  - "001763782" # Sector-level CPI
+  - "001587668" # Household confidence index
+
+bankruptcy_col: Status date
+company_col: Company name Latin alphabet
+
+revenue_cap: 3000
+num_classes: 2
+batch_size: 256
+epochs: 100
+lr: 1e-4
+hidden_size: 64
+num_layers: 2
+dropout: 0.2
+threshold: 0.7
+
+alpha: 0.90
+gamma: 2.5
+
+scheduler_factor: 0.75
+scheduler_patience: 5
+stopping_patience: 15
+min_lr: 1e-5
+
+decay_ih: 1e-5
+decay_hh: 1e-4
+decay_other: 1e-5
+
+train_fract: 0.8
+
+device: mps
+
+metrics:
+  - f1
+  - accuracy
+  - auroc
+  - matthews

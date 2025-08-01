@@ -8,21 +8,23 @@ from torchmetrics.classification import BinaryAccuracy, BinaryF1Score, BinaryMat
 from torch.nn.utils import clip_grad_norm_
 from src.utils.utils import RollingEarlyStopping, find_best_threshold
 
-logger = logging.getLogger(__name__)
-
 def train_one_epoch(model, loader, optimizer, loss_fn, device, metrics):
     model.train()
     for metric in metrics.values():
         metric.reset()
-    
+        
     total_loss = 0
     for batch in loader:
         firm_seq = batch["firm_seq"].to(device) # (batch, T, F_firm)
-        macro_seq = batch["macro_seq"].to(device) # (T, F_macro) - shared across batch
+        encoder_inputs = batch["macro_past"].to(device)  # (T, F_macro - 12) - shared across batch
+        decoder_inputs = batch["macro_future"].to(device) # (T, 12) - shared across batch
         labels = batch["label"].to(device) # (batch, 1)
-
+        
+        B, T, _ = firm_seq.shape
+        static_inputs = torch.zeros((B, 6, model.static_input_dim), device=device)
+        
         optimizer.zero_grad()
-        preds = model(firm_seq, macro_seq) # (batch, 1)
+        preds, _ = model(firm_seq, encoder_inputs, decoder_inputs, static_inputs)
         
         loss = loss_fn(preds, labels)
         loss.backward()
@@ -55,10 +57,14 @@ def evaluate_one_epoch(model, loader, loss_fn, device, metrics):
     with torch.no_grad():
         for batch in loader:
             firm_seq = batch["firm_seq"].to(device)
-            macro_seq = batch["macro_seq"].to(device)
+            encoder_inputs = batch["macro_past"].to(device)
+            decoder_inputs = batch["macro_future"].to(device)
             labels = batch["label"].to(device)
             
-            preds = model(firm_seq, macro_seq)
+            B, T, _ = firm_seq.shape
+            static_inputs = torch.zeros((B, 1, model.static_input_dim), device=device)
+            
+            preds, _ = model(firm_seq, encoder_inputs, decoder_inputs, static_inputs)
             loss = loss_fn(preds, labels)
             total_loss += loss.item()
             
@@ -76,8 +82,8 @@ def evaluate_one_epoch(model, loader, loss_fn, device, metrics):
     computed_metrics["loss"] = avg_loss
     
     return computed_metrics
-    
-def train_model(
+
+def train_tft(
     model, train_loader, val_loader, loss_fn, optimizer,
     scheduler, stopping_patience, stopping_window, device, epochs, 
     metrics

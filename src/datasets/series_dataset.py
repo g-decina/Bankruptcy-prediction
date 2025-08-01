@@ -12,6 +12,7 @@ class SeriesDataset:
     
     def to_tensors(self, factory: TensorFactory, fin_scale=True, macro_scale=False):
         X = factory.financial_to_tensor(self.financial_df, fin_scale)
-        M = factory.macro_to_tensor(self.macro_series, macro_scale)
+        M_past, M_future = factory.macro_to_tensor(self.macro_series, macro_scale)
+        print(f"Past: {M_past.shape}, Future: {M_future.shape}")
         y = (self.financial_df[self.label_col].values if self.label_col else None)
-        return X, M, y
+        return X, M_past, M_future, y

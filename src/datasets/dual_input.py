@@ -13,7 +13,8 @@ class DualInputSequenceDataset(Dataset):
     def __init__(
         self, 
         firm_tensor: torch.Tensor, 
-        macro_tensor: torch.Tensor, 
+        macro_past_tensor: torch.Tensor, 
+        macro_future_tensor: torch.Tensor, 
         labels: torch.Tensor
     ):
         """
@@ -21,14 +22,17 @@ class DualInputSequenceDataset(Dataset):
         
         Dims:
             firm_tensor: (N, T, F_firm)
-            macro_tensor (_type_): (T, F_macro) — shared across whole batch
+            macro_past_tensor (_type_): (T, F_macro - 12) — shared across whole batch
+            macro_future_tensor (_type_): (T, 12) — shared across whole batch
             labels (_type_): (N, 1)
         """
         # ---- numpy -> torch conversion if needed ----
         if isinstance(firm_tensor, np.ndarray):
             firm_tensor = torch.tensor(firm_tensor, dtype=torch.float32)
-        if isinstance(macro_tensor, np.ndarray):
-            macro_tensor = torch.tensor(macro_tensor, dtype=torch.float32)
+        if isinstance(macro_past_tensor, np.ndarray):
+            macro_past_tensor = torch.tensor(macro_past_tensor, dtype=torch.float32)
+        if isinstance(macro_future_tensor, np.ndarray):
+            macro_future_tensor = torch.tensor(macro_future_tensor, dtype=torch.float32)
         if isinstance(labels, np.ndarray):
             labels = torch.tensor(labels, dtype=torch.float32)
         
@@ -41,7 +45,8 @@ class DualInputSequenceDataset(Dataset):
             raise ValueError(f"Firm tensor must be 2D, or 3D. Got {firm_tensor.dim()}D tensor.")
             
         self.firm_tensor = firm_tensor
-        self.macro_tensor = macro_tensor
+        self.macro_past_tensor = macro_past_tensor
+        self.macro_future_tensor = macro_future_tensor
         self.labels = labels.view(-1, 1)
         
     def __len__(self):
@@ -50,12 +55,13 @@ class DualInputSequenceDataset(Dataset):
     def __getitem__(self, idx):
         return {
             "firm_seq": self.firm_tensor[idx],
-            "macro_seq": self.macro_tensor,
+            "macro_past": self.macro_past_tensor,
+            "macro_future": self.macro_future_tensor,
             "label": self.labels[idx]
         }
         
     def input_dims(self):
-        return self.firm_tensor.shape, self.macro_tensor.shape
+        return self.firm_tensor.shape, self.macro_past_tensor.shape, self.macro_future_tensor.shape
     
     def label_distribution(self):
         num_pos = (self.labels == 1).sum().item()
@@ -83,13 +89,15 @@ class DualInputSequenceDataset(Dataset):
         
         train_dataset = DualInputSequenceDataset(
             self.firm_tensor[train_idx],
-            self.macro_tensor,
+            self.macro_past_tensor,
+            self.macro_future_tensor,
             self.labels[train_idx]
         )
         
         val_dataset = DualInputSequenceDataset(
             self.firm_tensor[val_idx],
-            self.macro_tensor,
+            self.macro_past_tensor,
+            self.macro_future_tensor,
             self.labels[val_idx]
         )
         
@@ -113,7 +121,8 @@ class DualInputSequenceDataset(Dataset):
             device (torch.device): The target device ('cpu', 'cuda' or 'mps').
         """
         self.firm_tensor = self.firm_tensor.to(device)
-        self.macro_tensor = self.macro_tensor.to(device)
+        self.macro_past_tensor = self.macro_past_tensor.to(device)
+        self.macro_future_tensor = self.macro_future_tensor.to(device)
         self.labels = self.labels.to(device)
         
         print(f"Data sent to device: {device}")

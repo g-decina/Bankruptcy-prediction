@@ -153,7 +153,8 @@ class MacroTimeSeries(TimeSeries):
         if years:
             self._cut()
         
-        self.predictions = self._forecast(method, n_periods, order)
+        self.past_data = None
+        self.future_data = None
     
     def _cut(self) -> pd.Series:
         first_year, last_year = self.years[0], self.years[-1]
@@ -161,21 +162,36 @@ class MacroTimeSeries(TimeSeries):
         if not isinstance(self.data.index, pd.DatetimeIndex):
             raise TypeError("TimeSeries index must be a pd.DatetimeIndex")
         
-        data = self.data.loc[
+        # ---- 1. Select past data from first_year to last_year ----
+        self.past_data = self.data.loc[
             datetime.date(year=first_year, month=1, day=1):
             datetime.date(year=last_year, month=12, day=31)
         ]
-        self.data=data
         
+        # ---- 2. Select future data for the next year ----
+        future_start = datetime.date(year=last_year+1, month=1, day=1)
+        
+        self.future_data = self.data.loc[future_start:]
+        
+        # ---- 3. If future data is incomplete, forecast ----
+        expected_end = datetime.date(year=last_year+1, month=12, day=31)
+        if self.future_data.empty or self.future_data.index[-1].date() < expected_end:
+            forecast = self._forecast(self.future_data, method="prophet", n_periods=12)
+            
+            self.future_data = pd.concat([self.future_data, forecast])
+        
+        self.data = pd.concat([self.past_data, self.future_data])
         return self.data
     
     def _forecast(self, method: str, n_periods: int, order: tuple):
         if method == "prophet":
-            self.forecast = self.forecast_prophet(n_periods)
+            forecast = self.forecast_prophet(n_periods)
         elif method == "arima":
-            self.forecast = self.forecast_ARIMA(n_periods, order)
+            forecast = self.forecast_ARIMA(n_periods, order)
         else:
             raise ValueError("Either Prophet or ARIMA is used to produce forecasts")
+        
+        return forecast
     
     def forecast_ARIMA(
         self,    
@@ -206,7 +222,8 @@ class MacroTimeSeries(TimeSeries):
         )
         forecast_df = pd.DataFrame({"yhat": forecast})
         forecast_df.index.name = "year"
-        return forecast_df.reset_index()
+        
+        return forecast_df
 
     def forecast_prophet(
         self,
@@ -221,15 +238,16 @@ class MacroTimeSeries(TimeSeries):
         
         freq = pd.infer_freq(data["ds"])
         if freq is None:
-            freq = "MS" # Assume monthly by default
-        future = model_fit.make_future_dataframe(
-            periods = n_periods, freq = freq
-        )
+            freq = "Y"
+        
+        future = model_fit.make_future_dataframe(periods = n_periods, freq = freq)
         forecast = model_fit.predict(future)
-        return forecast[["ds", "yhat"]].set_index("ds").squeeze()
+        
+        forecast = forecast.set_index("ds")["yhat"]
+        return forecast[-n_periods:]
     
     def average_per_year(self) -> pd.Series:
-        return self.forecast.resample("YE").mean
+        return self.forecast.resample("YE").mean()
 
 class FinancialTimeSeries(TimeSeries):
     def __init__(

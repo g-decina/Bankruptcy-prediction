@@ -17,7 +17,7 @@ from pathlib import Path
 from src.datasets.dual_input import DualInputSequenceDataset
 from src.models.gru import GRUModel
 from src.data.pipeline import IngestionPipeline
-from src.train import train_model
+from train.gru import train_model
 from src.utils.utils import CustomReduceLROnPlateau, collate_with_macro
 
 logging.basicConfig(

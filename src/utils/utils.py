@@ -131,6 +131,9 @@ def find_best_threshold(model, val_loader, device, n_steps=101):
             labels = batch["label"].to(device).squeeze(-1).int()
 
             logits = model(firm_x, macro_x)
+            if isinstance(logits, tuple):
+                logits = logits[0] # Handle TFT case
+            
             probs = torch.sigmoid(logits).squeeze(-1)
             
             all_probs.append(probs)

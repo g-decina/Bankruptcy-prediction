@@ -61,16 +61,27 @@ class TensorFactory:
         return torch.tensor(X, dtype=torch.float32)
     
     def macro_to_tensor(self, macro_series: list[MacroTimeSeries], scale: bool = False):
+        logger.info("Converting macroeconomic series to tensors...")
+        
         stacked=torch.stack([s.to_tensor().float() for s in macro_series])
         
         if scale:
             logger.info("Scaling macro data with RobustScaler...")
-            scaled = [
-                torch.tensor(RobustScaler().fit_transform(s.numpy().reshape(-1, 1)).flatten())
-                for s in stacked
-            ]
+            scaled = []
+            for s in stacked:
+                scaled_tensor = torch.tensor(
+                    RobustScaler().fit_transform(s.numpy().reshape(-1, 1)).flatten()
+                )
+                scaled.append(scaled_tensor)
+            stacked = torch.stack(scaled)
             logger.info(f"Shaped macro data tensor: {torch.stack(scaled).shape}")
-            return torch.stack(scaled)
         
-        logger.info(f"Shaped macro data tensor: {stacked.shape}")
-        return stacked
+        if stacked.shape[1] < 12:
+            raise ValueError(f"Expected at least 12 future periods, got shape: {stacked.shape}")
+        
+        past=stacked[:, :-12]
+        future=stacked[:, -12:]
+        
+        logger.info(f"Shaped macro data tensor: {past.shape} (past), {future.shape} (future)")
+        
+        return past, future

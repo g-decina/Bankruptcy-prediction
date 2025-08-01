@@ -142,4 +142,4 @@ class TFTModel(nn.Module):
         logits = self.output_layer(enriched)
         logits = self.output_dropout(logits)
         
-        return logits[:, -decoder_context.shape[1]:], attn_weights
+        return logits[:, -1, :], attn_weights

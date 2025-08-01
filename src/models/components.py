@@ -110,6 +110,10 @@ class VariableSelectionNetwork(nn.Module):
         ])
         
     def forward(self, embedding_list, context=None): 
+        for i, x in enumerate(embedding_list):
+            if x.dim() != 3:
+                print(f"❌ Embedding {i} has shape {x.shape}, expected 3D (B, T, D)")
+                raise RuntimeError("One of the inputs to VariableSelectionNetwork is 4D")
         combined = torch.cat(embedding_list, dim=-1) # (B, T, D_total)
         raw_weights = self.flattened_grn(combined, context)
         
