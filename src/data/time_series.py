@@ -6,6 +6,7 @@ import logging
 
 from statsmodels.tsa.arima.model import ARIMA
 from prophet import Prophet
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level = logging.INFO)
@@ -148,13 +149,12 @@ class MacroTimeSeries(TimeSeries):
         method: str = "prophet"
     ):
         super().__init__(data)
+        self.past_data = None
+        self.future_data = None
         self.years=years
         
         if years:
             self._cut()
-        
-        self.past_data = None
-        self.future_data = None
     
     def _cut(self) -> pd.Series:
         first_year, last_year = self.years[0], self.years[-1]
@@ -175,15 +175,15 @@ class MacroTimeSeries(TimeSeries):
         
         # ---- 3. If future data is incomplete, forecast ----
         expected_end = datetime.date(year=last_year+1, month=12, day=31)
-        if self.future_data.empty or self.future_data.index[-1].date() < expected_end:
-            forecast = self._forecast(self.future_data, method="prophet", n_periods=12)
+        if self.future_data is None or self.future_data.index[-1].date() < expected_end:
+            forecast = self._forecast(method="prophet", n_periods=12)
             
             self.future_data = pd.concat([self.future_data, forecast])
         
         self.data = pd.concat([self.past_data, self.future_data])
         return self.data
     
-    def _forecast(self, method: str, n_periods: int, order: tuple):
+    def _forecast(self, method: str, n_periods: int, order: Optional[tuple]=None):
         if method == "prophet":
             forecast = self.forecast_prophet(n_periods)
         elif method == "arima":

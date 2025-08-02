@@ -54,16 +54,10 @@ class IngestionPipeline:
         ]
         
         label_col=f"bankrupt_{years[-1]}" if self.mode == "train" else None
-        self.feature_engineer=FeatureEngineer(years=years, label_col=label_col)
-        
-        if self.mode == "Train":
-            company_df=self.feature_engineer.fit_transform(company_df)
-        else:
-            company_df=self.feature_engineer.transform(company_df)
             
-        self.series_dataset=SeriesDataset(
-            financial_df=company_df, macro_series=macro_series, years=years, label_col=label_col
-        )
+        self.series_dataset=SeriesDataset(financial_df=company_df, 
+                                        macro_series=macro_series, years=years, 
+                                        label_col=label_col)
         
     def get_tensors(self, fin_scale: bool=True, macro_scale: bool=False):
         assert self.series_dataset is not None, "Pipeline not yet run. Call run() before exporting tensors."

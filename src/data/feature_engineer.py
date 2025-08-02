@@ -32,18 +32,25 @@ class FeatureEngineer:
                     df[f"revenue_{y2}"] - df[f"revenue_{y1}"]
                     ) / df[f"revenue_{y1}"]
             except KeyError as e:
-                logger.warning(f"Missing column during growth computation: {e}")
+                logger.error(f"Missing column during growth computation: {e}")
         
         revenue_cols = [f"revenue_{y}" for y in years if f"revenue_{y}" in df.columns]
         ebt_cols = [f"ebt_{y}" for y in years if f"ebt_{y}" in df.columns]
         cf_cols = [f"cf_{y}" for y in years if f"cf_{y}" in df.columns]
         
         # ---- Ratio features ---- 
-        try:
-            df["ebt_margin_avg"] = df[ebt_cols].mean(axis = 1) / df[revenue_cols].mean(axis = 1)
-            df["cf_margin_avg"] = df[cf_cols].mean(axis = 1) / df[revenue_cols].mean(axis = 1)
-        except ZeroDivisionError:
-            logger.warning("Zero division occured during margin computation")
+        for y in years:
+            try:
+                df[f"net_marg_{y}"] = df[f"ebt_{y}"] / df[f"revenue_{y}"]
+                df[f"roa_{y}"] = df[f"ebt_{y}"] / df[f"ats_{y}"]
+                df[f"roe_{y}"] = df[f"ebt_{y}"] / df[f"sheq_{y}"]
+                df[f"cf_marg_{y}"] = df[f"cf_{y}"] / df[f"revenue_{y}"]
+                df[f"cf_roa_{y}"] = df[f"cf_{y}"] / df[f"ats_{y}"]
+                df[f"eq_ratio_{y}"] = df[f"sheq_{y}"] / df[f"ats_{y}"]
+                df[f"asset_tov_{y}"] = df[f"revenue_{y}"] / df[f"ats_{y}"]
+                df[f"rev_p_unit_ats_{y}"] = df[f"revenue_{y}"] / df[f"sheq_{y}"]
+            except ValueError as e:
+                logger.error(f"Could not perform ratio computation: {e}")
 
         # ---- Volatility features ----
         if len(revenue_cols) >= 2:
@@ -54,16 +61,17 @@ class FeatureEngineer:
             df["cf_volatility"] = df[cf_cols].std(axis=1)
         
         # ---- Cleanup ---- 
-        
         df = df.replace([np.inf, -np.inf], np.nan)
         df = df.dropna()
+        df = df.reset_index()
         
         return df
         
     def fit(self, df: pd.DataFrame) -> pd.DataFrame:
         """Applies transformations and stores expected columns."""
         logger.info("Fitting feature engineer...")
-        df = self._engineer(df.copy())
+        df = df.copy()
+        df = self._engineer(df)
         self.expected_columns = df.columns.tolist()
         
         missing = [col for col in self.expected_columns if col not in df.columns]
@@ -93,11 +101,12 @@ class FeatureEngineer:
         
         return df
     
+    # DOES DOUBLE ENGINEER — DO NOT USE
     def fit_transform(self, df: pd.DataFrame) -> pd.DataFrame:
         """Applies transformations and reindexes to expected columns."""
         df = df.copy()
-        
-        return self.fit(df).transform(df)
+        df = self.fit(df)
+        return self.transform(df)
     
     def save(self, path: str):
         path = Path(path)

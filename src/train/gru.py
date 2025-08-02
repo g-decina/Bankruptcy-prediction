@@ -18,11 +18,11 @@ def train_one_epoch(model, loader, optimizer, loss_fn, device, metrics):
     total_loss = 0
     for batch in loader:
         firm_seq = batch["firm_seq"].to(device) # (batch, T, F_firm)
-        macro_seq = batch["macro_seq"].to(device) # (T, F_macro) - shared across batch
+        macro_past = batch["macro_past"].to(device) # (T, F_macro) - shared across batch
         labels = batch["label"].to(device) # (batch, 1)
 
         optimizer.zero_grad()
-        preds = model(firm_seq, macro_seq) # (batch, 1)
+        preds = model(firm_seq, macro_past) # (batch, 1)
         
         loss = loss_fn(preds, labels)
         loss.backward()
@@ -43,6 +43,7 @@ def train_one_epoch(model, loader, optimizer, loss_fn, device, metrics):
     computed_metrics = {
         name: metric.compute().item() for name, metric in metrics.items()
     }
+    computed_metrics["loss"] = avg_loss
     
     return avg_loss, computed_metrics
 
@@ -55,10 +56,11 @@ def evaluate_one_epoch(model, loader, loss_fn, device, metrics):
     with torch.no_grad():
         for batch in loader:
             firm_seq = batch["firm_seq"].to(device)
-            macro_seq = batch["macro_seq"].to(device)
+            macro_past = batch["macro_past"].to(device)
             labels = batch["label"].to(device)
             
-            preds = model(firm_seq, macro_seq)
+            preds = model(firm_seq, macro_past)
+            
             loss = loss_fn(preds, labels)
             total_loss += loss.item()
             

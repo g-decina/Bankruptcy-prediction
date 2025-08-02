@@ -17,6 +17,7 @@ class TFTModel(nn.Module):
         dropout=0.1
     ):
         super().__init__()
+        self.type = "tft"
         
         assert hidden_dim % attention_heads == 0
         self.hidden_dim = hidden_dim

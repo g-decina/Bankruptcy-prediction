@@ -1,4 +1,4 @@
-firm_data: data/demo_data.xlsx
+firm_data: data/demo_data2.xlsx
 macro_data:
   - "010774417" # Sector-level turnover
   - "001763782" # Sector-level CPI
@@ -9,20 +9,19 @@ company_col: Company name Latin alphabet
 
 revenue_cap: 3000
 num_classes: 2
-batch_size: 256
-epochs: 100
-lr: 1e-4
-hidden_size: 64
-num_layers: 2
-dropout: 0.2
+batch_size: 64
+epochs: 60
+lr: 1e-3
+hidden_size: 128
+dropout: 0.3
 threshold: 0.7
 
 alpha: 0.90
 gamma: 2.5
 
-scheduler_factor: 0.75
+scheduler_factor: 0.5
 scheduler_patience: 5
-stopping_patience: 15
+stopping_patience: 100
 min_lr: 1e-5
 
 decay_ih: 1e-5

@@ -103,20 +103,20 @@ class RollingEarlyStopping(EarlyStopping):
 def collate_with_macro(batch):
     """
     Custom collate_fn that stacks firm_seq and label normally,
-    and replicates macro_seq across the batch.
+    and replicates macro across the batch.
     """
     firm_seq = torch.stack([item["firm_seq"] for item in batch])
     labels = torch.stack([item["label"] for item in batch])
     
     # We assume all macro_seq are identical (shared), so take the first
-    macro_seq = batch[0]["macro_seq"].T
+    macro_past = batch[0]["macro_past"].T
     
     # Expand macro_seq to match batch size
-    macro_seq = macro_seq.unsqueeze(0).expand(len(batch), -1, -1)
+    macro_past = macro_past.unsqueeze(0).expand(len(batch), -1, -1)
 
     return {
         "firm_seq": firm_seq,
-        "macro_seq": macro_seq,
+        "macro_past": macro_past,
         "label": labels
     }
 
@@ -126,11 +126,17 @@ def find_best_threshold(model, val_loader, device, n_steps=101):
 
     with torch.no_grad():
         for batch in val_loader:
-            firm_x = batch["firm_seq"].to(device)
-            macro_x = batch["macro_seq"].to(device)
+            firm_seq = batch["firm_seq"].to(device)
+            macro_past = batch["macro_past"].to(device)
             labels = batch["label"].to(device).squeeze(-1).int()
 
-            logits = model(firm_x, macro_x)
+            if model.type == "gru":
+                logits = model(firm_seq, macro_past)
+            elif model.type == "tft":
+                macro_future = batch["macro_future"].to(device)
+                B, T, _ = firm_seq.shape
+                static_inputs = torch.zeros((B, 6, model.static_input_dim), device=device)
+                logits, _ = model(firm_seq, macro_past, macro_future, static_inputs)
             if isinstance(logits, tuple):
                 logits = logits[0] # Handle TFT case
             

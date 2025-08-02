@@ -33,8 +33,11 @@ class TensorFactory:
         df = df.copy()
         
         feature_blocks = []
-        for year in self.years:
-            features = df[[f"revenue_{year}", f"ebt_{year}", f"sheq_{year}", f"cf_{year}"]].to_numpy()
+        for y in self.years:
+            features = df[[
+                f"revenue_{y}", f"ebt_{y}", f"sheq_{y}", f"cf_{y}", f"net_marg_{y}",
+                f"roa_{y}", f"roe_{y}", f"cf_marg_{y}", f"cf_roa_{y}", f"eq_ratio_{y}",
+                f"eq_ratio_{y}", f"asset_tov_{y}", f"rev_p_unit_ats_{y}"]].to_numpy()
             feature_blocks.append(features)
         
         # Stack: [samples, timesteps=3, features=4]
@@ -51,12 +54,12 @@ class TensorFactory:
                     scaler=RobustScaler()
                     feature_t = X[:, t, i].reshape(-1, 1)
                     X_scaled[:, t, i]=scaler.fit_transform(feature_t).flatten()
-                    scalers[i][t]=(scaler) # TO ADD: return scalers for transformation
+                    scalers[i][t]=(scaler) 
+                    # TO ADD: return scalers for future transformation
             
             X = X_scaled
             
-
-        logger.info(f"Shaped financial data tensor: {X.shape}")
+        logger.info(f"Financial data tensor shape: {X.shape}")
 
         return torch.tensor(X, dtype=torch.float32)
     
@@ -82,6 +85,6 @@ class TensorFactory:
         past=stacked[:, :-12]
         future=stacked[:, -12:]
         
-        logger.info(f"Shaped macro data tensor: {past.shape} (past), {future.shape} (future)")
+        logger.info(f"Macro data tensor shape: {past.shape} (past), {future.shape} (future)")
         
         return past, future

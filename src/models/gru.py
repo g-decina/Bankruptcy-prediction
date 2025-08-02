@@ -16,6 +16,7 @@ class GRUModel(nn.Module):
         dropout = 0.2
     ):
         super().__init__()
+        self.type = "gru"
         
         # ---- For company-level data ----
         self.firm_gru = nn.GRU(

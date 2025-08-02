@@ -45,6 +45,7 @@ def train_one_epoch(model, loader, optimizer, loss_fn, device, metrics):
     computed_metrics = {
         name: metric.compute().item() for name, metric in metrics.items()
     }
+    computed_metrics["loss"] = avg_loss
     
     return avg_loss, computed_metrics
 

@@ -2,13 +2,16 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 import logging
+from typing import Optional
 
 from src.data.insee import get_insee_series
+from src.data.feature_engineer import FeatureEngineer
 
 logger = logging.getLogger(__name__)
 
 class CompanyDataLoader:
-    def __init__(self, path: Path, sheet_name: str="Results", revenue_cap=3_000):
+    def __init__(self, path: Path, sheet_name: str="Results", revenue_cap=3_000,
+                feature_engineer=Optional[FeatureEngineer]):
         if isinstance(path, tuple):
             if len(path) != 1:
                 raise ValueError(f"Expected a single path, got tuple of length {len(path)}: {path}")
@@ -21,6 +24,8 @@ class CompanyDataLoader:
         self.bankruptcy_col=None
         self.years=None
         self.mode=None
+        
+        self.feature_engineer = None
         
     def load(self, company_col: str, bankruptcy_col: str, mode: str = "train"):
         self.company_col=company_col
@@ -35,14 +40,27 @@ class CompanyDataLoader:
             {int(col[-4:]) for col in df.columns if "revenue" in col}
         )
         
-        return self._clean(df)
+        df = self._clean(df)
+        
+        if self.feature_engineer is None:
+            self.feature_engineer = FeatureEngineer(
+                years=[str(y) for y in self.years], label_col=self.bankruptcy_col)
+        
+        logger.info("Applying feature engineering...")
+        if self.mode == "train":
+            df_cleaned = self.feature_engineer.fit(df)
+        else:
+            df_cleaned = self.feature_engineer.transform(df)
+        
+        return df_cleaned
         
     def _read_file(self) -> pd.DataFrame:
         logger.info(f"Reading file: {self.path}")
         return pd.read_excel(
             self.path, 
             sheet_name=self.sheet_name, 
-            na_values=["n.a."]
+            na_values=["n.a."],
+            engine="openpyxl"
         )
         
     def _clean(self, df: pd.DataFrame):
@@ -97,10 +115,10 @@ class CompanyDataLoader:
         column_aliases = {
             "Operating revenue (Turnover)\nth USD ": "revenue",
             "P/L before tax\nth USD ": "ebt",
-            # "Total assets\nth USD ": "ats",
+            "Total assets\nth USD ": "ats",
             "Shareholders funds\nth USD ": "sheq",
             "Cash flow [Net Income before D&A]\nth USD ": "cf",
-            # "Current ratio\n": "cr"
+            "Current ratio\n": "cr"
         }
         financial_columns = {
             f"{dirty}{year}": f"{clean}_{year}"
