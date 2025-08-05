@@ -63,7 +63,16 @@ class TensorFactory:
 
         return torch.tensor(X, dtype=torch.float32)
     
-    def macro_to_tensor(self, macro_series: list[MacroTimeSeries], scale: bool = False):
+    def downsample_to_annual(t: torch.Tensor, periods_per_year: int) -> torch.Tensor:
+        # shape: (D_macro, T)
+        T = t.shape[1]
+        if T % periods_per_year != 0:
+            raise ValueError(f"Cannot evenly group {T} periods into years of {periods_per_year}.")
+        
+        return t.view(t.shape[0], -1, periods_per_year).mean(dim=-1)
+    
+    def macro_to_tensor(self, macro_series: list[MacroTimeSeries], 
+                        scale: bool = False, downsample: bool = True):
         logger.info("Converting macroeconomic series to tensors...")
         
         stacked=torch.stack([s.to_tensor().float() for s in macro_series])
@@ -82,9 +91,23 @@ class TensorFactory:
         if stacked.shape[1] < 12:
             raise ValueError(f"Expected at least 12 future periods, got shape: {stacked.shape}")
         
-        past=stacked[:, :-12]
-        future=stacked[:, -12:]
-        
+        if downsample:
+            logger.info(f"Downsampling macro data to annual resolution...")
+            
+            D, T = stacked.shape
+            usable_T = T - (T % 12)
+            if usable_T == 0:
+                raise ValueError(f"Too few time steps ({T}) to downsample.")
+            
+            stacked = stacked[:, :usable_T]
+            stacked = stacked.view(D, -1, 12).mean(dim=-1)
+            
+            past=stacked[:, :-len(self.years)]
+            future=stacked[:, -1:]
+        else:
+            past=stacked[:, -12 * len(self.years):-12]
+            future=stacked[:, -12:]
+            
         logger.info(f"Macro data tensor shape: {past.shape} (past), {future.shape} (future)")
         
         return past, future

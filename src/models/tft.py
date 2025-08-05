@@ -66,6 +66,8 @@ class TFTModel(nn.Module):
         )
         self.output_layer=nn.Linear(hidden_dim, 1)
         self.output_dropout = nn.Dropout(dropout)
+        
+        self.apply(self._init_weight)
     
     def forward(
         self, 
@@ -104,7 +106,7 @@ class TFTModel(nn.Module):
             encoder_macro_inputs = encoder_macro_inputs.unsqueeze(0).expand(B, -1, -1) 
         
         # ---- 0. Project temporal inputs ----
-        company_embeds = [
+        encoder_embeds = [
             self.company_projections[i](encoder_company_inputs[..., i].unsqueeze(-1))
             for i in range(encoder_company_inputs.shape[-1])
         ]
@@ -113,7 +115,7 @@ class TFTModel(nn.Module):
             self.macro_projections[i](encoder_macro_inputs[..., i].unsqueeze(-1))
             for i in range(encoder_macro_inputs.shape[-1])
         ]
-        encoder_embeds = company_embeds + macro_embeds
+        encoder_embeds = encoder_embeds + macro_embeds
         
         decoder_embeds = [
             proj(decoder_inputs[..., i].unsqueeze(-1))
@@ -140,7 +142,26 @@ class TFTModel(nn.Module):
         
         # ---- 5. Positional processing and projection ----
         enriched = self.position_grn(enriched, context=static_state_ctx)
+        # fusion = enriched + static_temporal_ctx + decoder_embeds
         logits = self.output_layer(enriched)
         logits = self.output_dropout(logits)
         
         return logits[:, -1, :], attn_weights
+    
+    @staticmethod
+    def _init_weight(module):
+        if isinstance(module, (nn.Linear, nn.Conv1d)):
+            nn.init.xavier_uniform_(module.weight)
+            if module.bias is not None:
+                nn.init.constant_(module.bias, 0)
+        elif isinstance(module, nn.LSTM):
+            for name, param in module.named_parameters():
+                if "weight_ih" in name:
+                    nn.init.xavier_uniform_(param.data)
+                elif "weight_hh" in name:
+                    nn.init.orthogonal_(param.data)
+                elif "bias" in name:
+                    nn.init.constant_(param.data, 0)
+        elif isinstance(module, nn.LayerNorm):
+            nn.init.constant_(module.bias, 0)
+            nn.init.constant_(module.weight, 1.0)

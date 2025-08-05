@@ -10,7 +10,7 @@ company_col: Company name Latin alphabet
 revenue_cap: 3000
 num_classes: 2
 batch_size: 64
-epochs: 60
+epochs: 100
 lr: 1e-3
 hidden_size: 128
 dropout: 0.3
@@ -37,3 +37,5 @@ metrics:
   - accuracy
   - auroc
   - matthews
+  - precision
+  - recall

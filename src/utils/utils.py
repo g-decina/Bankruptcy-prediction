@@ -1,6 +1,9 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import matplotlib.pyplot as plt
+import mlflow
+import io
 import copy
 import logging
 
@@ -9,7 +12,8 @@ from dataclasses import dataclass, field
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torchmetrics.classification import (
     BinaryAccuracy, BinaryAUROC, BinaryF1Score, BinaryMatthewsCorrCoef,
-    MulticlassAccuracy, MulticlassAUROC, MulticlassF1Score)
+    MulticlassAccuracy, MulticlassAUROC, MulticlassF1Score,
+    BinaryRecall, BinaryPrecision, BinaryPrecisionRecallCurve)
 from torchmetrics.functional import f1_score
 from torchmetrics import MetricCollection
 from typing import Optional
@@ -113,7 +117,7 @@ def collate_with_macro(batch):
     
     # Expand macro_seq to match batch size
     macro_past = macro_past.unsqueeze(0).expand(len(batch), -1, -1)
-
+    
     return {
         "firm_seq": firm_seq,
         "macro_past": macro_past,
@@ -264,7 +268,9 @@ class TrainConfig:
                 "f1": BinaryF1Score(self.threshold),
                 "accuracy": BinaryAccuracy(self.threshold),
                 "auroc": BinaryAUROC(),
-                "matthews": BinaryMatthewsCorrCoef(self.threshold)
+                "matthews": BinaryMatthewsCorrCoef(self.threshold),
+                "recall": BinaryRecall(self.threshold),
+                "precision": BinaryPrecision(self.threshold)
             }
         else:
             available = {

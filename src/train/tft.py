@@ -1,9 +1,13 @@
 import mlflow
 import logging
 import torch
+import io
+import matplotlib.pyplot as plt
 from tqdm import trange
 
-from torchmetrics.classification import BinaryAccuracy, BinaryF1Score, BinaryMatthewsCorrCoef
+from torchmetrics.classification import (BinaryAccuracy, BinaryF1Score, 
+                            BinaryMatthewsCorrCoef, BinaryPrecision, BinaryRecall,
+                            BinaryPrecisionRecallCurve)
 
 from torch.nn.utils import clip_grad_norm_
 from src.utils.utils import RollingEarlyStopping, find_best_threshold
@@ -35,7 +39,10 @@ def train_one_epoch(model, loader, optimizer, loss_fn, device, metrics):
         total_loss += loss.item()
         for metric in metrics.values():
             for metric in metrics.values():
-                if isinstance(metric, (BinaryF1Score, BinaryMatthewsCorrCoef, BinaryAccuracy)):
+                if isinstance(metric, (
+                    BinaryF1Score, BinaryMatthewsCorrCoef, BinaryAccuracy,
+                    BinaryPrecision, BinaryRecall
+                )):
                     preds_binary = (preds.sigmoid() > 0.5).int()
                     metric.update(preds_binary, labels.int())
                 else:
@@ -49,10 +56,13 @@ def train_one_epoch(model, loader, optimizer, loss_fn, device, metrics):
     
     return avg_loss, computed_metrics
 
-def evaluate_one_epoch(model, loader, loss_fn, device, metrics):
+def evaluate_one_epoch(model, loader, loss_fn, device, metrics, log_pr_curve: bool=False):
     model.eval()
     for metric in metrics.values():
         metric.reset()
+    
+    if log_pr_curve:
+        pr_curve = BinaryPrecisionRecallCurve().to(device)
     
     total_loss = 0
     with torch.no_grad():
@@ -69,12 +79,19 @@ def evaluate_one_epoch(model, loader, loss_fn, device, metrics):
             loss = loss_fn(preds, labels)
             total_loss += loss.item()
             
+            labels = labels.to(torch.int64)
+            if log_pr_curve:
+                pr_curve.update(torch.sigmoid(preds), labels)
+            
             for metric in metrics.values():
-                if isinstance(metric, (BinaryF1Score, BinaryMatthewsCorrCoef, BinaryAccuracy)):
+                if isinstance(metric, (
+                    BinaryF1Score, BinaryMatthewsCorrCoef, BinaryAccuracy,
+                    BinaryPrecision, BinaryRecall
+                )):
                     preds_binary = (preds.sigmoid() > 0.5).int()
-                    metric.update(preds_binary, labels.int())
+                    metric.update(preds_binary, labels)
                 else:
-                    metric.update(preds, labels.int())
+                    metric.update(preds, labels)
                 
     avg_loss = total_loss / len(loader)
     computed_metrics = {
@@ -82,12 +99,21 @@ def evaluate_one_epoch(model, loader, loss_fn, device, metrics):
     }
     computed_metrics["loss"] = avg_loss
     
+    if log_pr_curve:
+        pr_curve.compute()
+        
+        plt.figure()
+        fig, ax = plt.subplots()
+        pr_curve.plot(ax=ax)
+        
+        mlflow.log_figure(fig, "plots/pr_curve.png")
+        
     return computed_metrics
 
 def train_tft(
     model, train_loader, val_loader, loss_fn, optimizer,
     scheduler, stopping_patience, stopping_window, device, epochs, 
-    metrics
+    metrics=None
 ):
     progress_bar = trange(epochs, desc = "Training", leave = True)
     early_stopping = RollingEarlyStopping(
@@ -105,7 +131,8 @@ def train_tft(
         for name, value in train_metrics.items():
             mlflow.log_metric(f"train_{name}", value, step = epoch)
             
-        val_metrics = evaluate_one_epoch(model, val_loader, loss_fn, device, metrics)
+        val_metrics = evaluate_one_epoch(model, val_loader, loss_fn, 
+                                        device, metrics, log_pr_curve=False)
         if "matthews" in val_metrics:
             early_stopping(metric=val_metrics["matthews"], model=model)
             
@@ -116,14 +143,15 @@ def train_tft(
         
         for name, value in val_metrics.items():
             mlflow.log_metric(f"val_{name}", value, step = epoch)
-            
+        
         scheduler.step(val_metrics["loss"])
         
         metric_display = " | ".join(f"{k.upper()}: {v:.5f}" for k, v in train_metrics.items())
         progress_bar.set_description(
-            f"Epoch {epoch+1}/{epochs} | Loss: {train_loss:.5f} | {metric_display}"
+            f"Epoch {epoch}/{epochs} | {metric_display}"
         )
         
     best_threshold, best_f1 = find_best_threshold(model, val_loader, device)
+    evaluate_one_epoch(model, val_loader, loss_fn, device, metrics, log_pr_curve=True)
     mlflow.log_metric("best_threshold", best_threshold)
     mlflow.log_metric("best_f1", best_f1)
